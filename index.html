@@ -362,12 +362,7 @@
       const btn = document.getElementById('sendBtn');
 
       if (!name || !phone) {
-        // Используем нативное уведомление Telegram, чтобы форма не зависала
-        if (tg && tg.showAlert) {
-          tg.showAlert('Пожалуйста, укажите ваше имя и телефон!');
-        } else {
-          alert('Пожалуйста, укажите ваше имя и телефон!');
-        }
+        alert('Пожалуйста, укажите ваше имя и телефон!');
         return;
       }
 
@@ -380,6 +375,7 @@
 
       if (tg && tg.sendData) {
         tg.sendData(JSON.stringify(orderData));
+        // Даем пользователю увидеть, что заказ отправляется, прежде чем закрыть WebApp
         setTimeout(() => {
           tg.close();
         }, 500);
