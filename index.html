@@ -339,4 +339,54 @@
       </div>`;
 
       container.innerHTML = html;
-      document.getElementById('orderModal').style
+      document.getElementById('orderModal').style.display = 'block';
+    }
+
+    function closeCart() {
+      document.getElementById('orderModal').style.display = 'none';
+    }
+
+    function filterProducts() {
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      const filtered = rawProducts.filter(item => {
+        if (item.type === 'section') return true;
+        return item.name.toLowerCase().includes(q);
+      });
+      renderProducts(filtered);
+    }
+
+    function sendOrder() {
+      const name = document.getElementById('custName').value.trim();
+      const phone = document.getElementById('custPhone').value.trim();
+      const comment = document.getElementById('custComment').value.trim();
+      const btn = document.getElementById('sendBtn');
+
+      if (!name || !phone) {
+        alert('Пожалуйста, укажите ваше имя и телефон!');
+        return;
+      }
+
+      // Меняем состояние кнопки
+      btn.disabled = true;
+      btn.textContent = '⏳ Отправка заказа...';
+
+      const total = cart.reduce((sum, item) => sum + (item.price * item.count), 0);
+      const orderData = { name, phone, comment, items: cart, total };
+
+      if (tg && tg.sendData) {
+        tg.sendData(JSON.stringify(orderData));
+        // Даем пользователю увидеть, что заказ отправляется, прежде чем закрыть WebApp
+        setTimeout(() => {
+          tg.close();
+        }, 500);
+      } else {
+        alert('Заказ сформирован! Открывайте эту страницу внутри Telegram-бота для отправки.');
+        btn.disabled = false;
+        btn.textContent = 'Отправить заказ менеджеру';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadData);
+  </script>
+</body>
+</html>
