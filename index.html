@@ -121,6 +121,7 @@
     const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1OenmMNDEhjy8N2DcKdoKFvICstfkqIyfP2_cLasdymY/export?format=csv&gid=224867329";
     const STATIC_PRODUCTS_URL = './products.csv';
     const PRODUCTS_CACHE_KEY = 'venda_products_cache_v1';
+    const ORDER_API_URL = 'https://venda-bot.onrender.com/api/order';
 
     const WAX_VOLS = ['500кг+', '100-499кг', 'Упаковка', '10-24кг', '5-9кг', '0-4кг'];
     const MAIN_VOLS = ['1000мл', '500мл', '200мл', '60мл', '33мл', '14мл'];
@@ -417,7 +418,7 @@
       renderProducts(filtered);
     }
 
-    function sendOrder() {
+    async function sendOrder() {
       const name = document.getElementById('custName').value.trim();
       const phone = document.getElementById('custPhone').value.trim();
       const comment = document.getElementById('custComment').value.trim();
@@ -428,23 +429,64 @@
         return;
       }
 
-      // Меняем состояние кнопки
+      if (cart.length === 0) {
+        alert('Корзина пуста!');
+        return;
+      }
+
+      if (!tg || !tg.initData) {
+        alert('Откройте каталог через новую кнопку после команды /start в Telegram.');
+        return;
+      }
+
       btn.disabled = true;
-      btn.textContent = '⏳ Отправка заказа...';
+      btn.textContent = '⏳ Отправка заказа…';
 
       const total = cart.reduce((sum, item) => sum + (item.price * item.count), 0);
-      const orderData = { name, phone, comment, items: cart, total };
+      const orderData = {
+        init_data: tg.initData,
+        name,
+        phone,
+        comment,
+        items: cart,
+        total
+      };
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 75000);
 
-      if (tg && tg.sendData) {
-        tg.sendData(JSON.stringify(orderData));
-        // Даем пользователю увидеть, что заказ отправляется, прежде чем закрыть WebApp
-        setTimeout(() => {
+      try {
+        const response = await fetch(ORDER_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderData),
+          signal: controller.signal
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(result.detail || `Ошибка сервера: ${response.status}`);
+        }
+
+        btn.textContent = '✅ Заказ отправлен';
+        cart = [];
+        updateCartBar();
+
+        const successMessage = `Заказ принят! Сумма: ${result.total} ₽`;
+        if (tg.showAlert) {
+          tg.showAlert(successMessage, () => tg.close());
+        } else {
+          alert(successMessage);
           tg.close();
-        }, 500);
-      } else {
-        alert('Заказ сформирован! Открывайте эту страницу внутри Telegram-бота для отправки.');
+        }
+      } catch (e) {
+        const errorMessage = e.name === 'AbortError'
+          ? 'Сервис запускается слишком долго. Нажмите отправить ещё раз.'
+          : e.message;
+        alert(`Не удалось отправить заказ: ${errorMessage}`);
         btn.disabled = false;
         btn.textContent = 'Отправить заказ менеджеру';
+      } finally {
+        clearTimeout(timeoutId);
       }
     }
 
