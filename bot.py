@@ -85,4 +85,12 @@ async def handle_web_app_data(message: types.Message):
         )
 
     except Exception as e:
-        logging.error(f"Ошибка при обработке заказа
+        logging.error(f"Ошибка при обработке заказа: {e}")
+        await message.answer("⚠️ Произошла ошибка при отправке заказа. Попробуйте еще раз.")
+
+async def main():
+    logging.basicConfig(level=logging.INFO)
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
