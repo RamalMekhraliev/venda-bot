@@ -7,7 +7,7 @@ from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.session.aiohttp import AiohttpSession
 
 # 1. Токен бота от @BotFather
-BOT_TOKEN = "8997817506:AAHEweQKDjKsFh5UolU0ogG4cRY_DJmRT1Q"
+BOT_TOKEN = "8997817506:AAEYfv6fY2QDLWVaGRxHS3sJjawZIaJlqMk"
 
 # 2. Ваш ID Telegram от @userinfobot (обязательно укажите ваши цифры!)
 MANAGER_CHAT_ID = "471582442" 
