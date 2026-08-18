@@ -4,17 +4,20 @@ import logging
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import CommandStart
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.client.session.aiohttp import AiohttpSession
 
 # 1. Токен бота от @BotFather
-BOT_TOKEN = "8997817506:AAHEweQKDjKsFh5UolU0ogG4cRY_DJmRTlQ"
+BOT_TOKEN = "8997817506:AAHEweQKDjKsFh5UolU0ogG4cRY_DJmRT1Q"
 
-# 2. Ваш ID Telegram от @userinfobot (замените на ваш ID)
-MANAGER_CHAT_ID = 123456789 
+# 2. Ваш ID Telegram от @userinfobot (обязательно укажите ваши цифры!)
+MANAGER_CHAT_ID = "471582442" 
 
-# 3. Ссылка на опубликованный WebApp на GitHub Pages
+# 3. Ссылка на ваш WebApp на GitHub Pages
 WEBAPP_URL = "https://ramalmekhraliev.github.io/venda-bot/"
 
-bot = Bot(token=BOT_TOKEN)
+# Прокси для бесплатного тарифа PythonAnywhere
+session = AiohttpSession(proxy="http://proxy.server:3128")
+bot = Bot(token=BOT_TOKEN, session=session)
 dp = Dispatcher()
 
 @dp.message(CommandStart())
