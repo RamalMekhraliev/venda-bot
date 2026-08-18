@@ -9,10 +9,12 @@ from urllib.parse import parse_qsl, urlsplit
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.types import (
+    BotCommand,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    MenuButtonCommands,
     ReplyKeyboardRemove,
     WebAppInfo,
 )
@@ -31,6 +33,7 @@ WEBAPP_URL = os.getenv(
 RENDER_EXTERNAL_URL = os.getenv(
     "RENDER_EXTERNAL_URL", "https://venda-bot.onrender.com"
 ).rstrip("/")
+SITE_URL = "https://vendaaroma.ru/"
 
 if not BOT_TOKEN:
     raise RuntimeError("Не задана переменная окружения BOT_TOKEN")
@@ -146,13 +149,8 @@ def build_manager_message(payload: OrderPayload, user: dict) -> tuple[str, int]:
     return message, calculated_total
 
 
-@dp.message(CommandStart())
-async def start_cmd(message: types.Message):
-    await message.answer(
-        "Каталог обновлён. Используйте кнопку под следующим сообщением.",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-    keyboard = InlineKeyboardMarkup(
+def catalog_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
         inline_keyboard=[[
             InlineKeyboardButton(
                 text="🛍 Открыть каталог и заказать",
@@ -160,13 +158,34 @@ async def start_cmd(message: types.Message):
             )
         ]]
     )
+
+
+@dp.message(CommandStart())
+async def start_cmd(message: types.Message):
+    await message.answer(
+        "Каталог обновлён. Используйте кнопку под следующим сообщением.",
+        reply_markup=ReplyKeyboardRemove(),
+    )
     await message.answer(
         f"Здравствуйте, {escape(message.from_user.first_name)}! 👋\n\n"
         "Добро пожаловать в магазин косметических отдушек <b>VENDA</b>.\n\n"
         "Откройте каталог, выберите нужные объёмы и оформите заказ.",
-        reply_markup=keyboard,
+        reply_markup=catalog_keyboard(),
         parse_mode="HTML",
     )
+
+
+@dp.message(Command("catalog"))
+async def catalog_cmd(message: types.Message):
+    await message.answer(
+        "🛍 Каталог",
+        reply_markup=catalog_keyboard(),
+    )
+
+
+@dp.message(Command("site"))
+async def site_cmd(message: types.Message):
+    await message.answer(SITE_URL)
 
 
 @app.post("/api/order")
@@ -234,8 +253,13 @@ async def health():
 
 @app.on_event("startup")
 async def on_startup():
+    await bot.set_my_commands([
+        BotCommand(command="catalog", description="Каталог"),
+        BotCommand(command="site", description="Сайт"),
+    ])
+    await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
     await bot.set_webhook(WEBHOOK_URL)
-    logger.info("Вебхук успешно установлен")
+    logger.info("Команды меню и вебхук успешно установлены")
 
 
 @app.post(WEBHOOK_PATH)
