@@ -1,31 +1,29 @@
-import asyncio
+import os
 import json
 import logging
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import CommandStart
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.client.session.aiohttp import AiohttpSession
+from fastapi import FastAPI, Request
 
-# 1. Токен бота от @BotFather
 BOT_TOKEN = "8997817506:AAEYfv6fY2QDLWVaGRxHS3sJjawZIaJlqMk"
-
-# 2. Ваш ID Telegram от @userinfobot (обязательно укажите ваши цифры!)
-MANAGER_CHAT_ID = "471582442" 
-
-# 3. Ссылка на ваш WebApp на GitHub Pages
+MANAGER_CHAT_ID = 8113113940
 WEBAPP_URL = "https://ramalmekhraliev.github.io/venda-bot/"
 
-# Прокси для бесплатного тарифа PythonAnywhere
-session = AiohttpSession(proxy="http://proxy.server:3128")
-bot = Bot(token=BOT_TOKEN, session=session)
+# Render автоматически подставит ваш будущий домен
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "https://venda-bot.onrender.com")
+WEBHOOK_PATH = f"/bot/{BOT_TOKEN}"
+WEBHOOK_URL = f"{RENDER_EXTERNAL_URL}{WEBHOOK_PATH}"
+
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
+app = FastAPI()
 
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🛍 Открыть каталог и заказать", web_app=WebAppInfo(url=WEBAPP_URL))]
     ])
-    
     await message.answer(
         f"Здравствуйте, {message.from_user.first_name}! 👋\n\n"
         f"Добро пожаловать в магазин косметических отдушек **VENDA**.\n\n"
@@ -38,7 +36,6 @@ async def start_cmd(message: types.Message):
 async def handle_web_app_data(message: types.Message):
     try:
         data = json.loads(message.web_app_data.data)
-        
         user = message.from_user
         client_name = data.get("name", user.full_name)
         client_phone = data.get("phone", "Не указан")
@@ -83,14 +80,17 @@ async def handle_web_app_data(message: types.Message):
             f"Менеджер свяжется с вами в течение нескольких минут для подтверждения.",
             parse_mode="HTML"
         )
-
     except Exception as e:
         logging.error(f"Ошибка при обработке заказа: {e}")
         await message.answer("⚠️ Произошла ошибка при отправке заказа. Попробуйте еще раз.")
 
-async def main():
-    logging.basicConfig(level=logging.INFO)
-    await dp.start_polling(bot)
+@app.on_event("startup")
+async def on_startup():
+    await bot.set_webhook(WEBHOOK_URL)
 
-if __name__ == "__main__":
-    asyncio.run(main())
+@app.post(WEBHOOK_PATH)
+async def bot_webhook(request: Request):
+    json_update = await request.json()
+    update = types.Update.model_validate(json_update, context={"bot": bot})
+    await dp.feed_update(bot, update)
+    return {"status": "ok"}
