@@ -7,7 +7,7 @@ from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.session.aiohttp import AiohttpSession
 
 BOT_TOKEN = "8997817506:AAEYfv6fY2QDLWVaGRxHS3sJjawZIaJlqMk"
-MANAGER_CHAT_ID = 8113113940
+MANAGER_CHAT_ID = 471582442
 WEBAPP_URL = "https://ramalmekhraliev.github.io/venda-bot/"
 
 session = AiohttpSession(proxy="http://proxy.server:3128")
