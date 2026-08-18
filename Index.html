@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VENDA | Заказ</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #0d0d0f; color: #f4f4f5; padding-bottom: 90px; }
+
+    header { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: #121214; border-bottom: 1px solid #27272a; position: sticky; top: 0; z-index: 100; }
+    .logo { font-size: 22px; font-weight: 900; color: #facc15; letter-spacing: 2px; }
+    
+    .search-box { padding: 12px 16px; }
+    .search-box input { width: 100%; background: #18181b; border: 1px solid #27272a; padding: 10px 14px; border-radius: 10px; color: #fff; font-size: 14px; outline: none; }
+
+    .products-list { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+    
+    .section-title { color: #facc15; font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px; padding: 8px 12px; background: rgba(250, 204, 21, 0.1); border-radius: 8px; }
+
+    .card { background: #18181b; border: 1px solid #27272a; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .card-title { font-weight: 700; font-size: 15px; color: #fff; }
+    .card-category { font-size: 12px; color: #a1a1aa; }
+    
+    .volume-selector { display: flex; gap: 6px; flex-wrap: wrap; }
+    .vol-btn { background: #27272a; border: 1px solid #3f3f46; color: #a1a1aa; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .vol-btn.active { background: rgba(250, 204, 21, 0.2); color: #fef08a; border-color: #facc15; }
+
+    .card-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+    .price { font-size: 16px; font-weight: 800; color: #fff; }
+
+    .add-btn { background: #ffffff; color: #09090b; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; }
+
+    /* Нижняя плашка корзины */
+    .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #121214; border-top: 1px solid #27272a; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; z-index: 200; }
+    .cart-btn { background: #facc15; color: #09090b; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 800; font-size: 15px; cursor: pointer; width: 100%; display: flex; justify-content: space-between; }
+
+    /* Модалка оформления */
+    .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 300; padding: 20px; overflow-y: auto; }
+    .modal-content { background: #121214; border: 1px solid #27272a; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .modal-title { font-size: 18px; font-weight: 800; color: #fff; }
+    
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 12px; color: #a1a1aa; font-weight: 600; }
+    .form-group input, .form-group select, .form-group textarea { background: #18181b; border: 1px solid #27272a; padding: 10px; border-radius: 8px; color: #fff; outline: none; font-size: 14px; }
+
+    .order-items-preview { font-size: 13px; color: #d4d4d8; border-bottom: 1px solid #27272a; padding-bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
+
+    .submit-btn { background: #facc15; color: #09090b; border: none; padding: 14px; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; }
+    .close-btn { background: transparent; color: #a1a1aa; border: none; padding: 8px; font-weight: 600; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">VENDA</div>
+    <div style="font-size: 12px; color: #a1a1aa;">Онлайн-заказ</div>
+  </header>
+
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Поиск аромата или позиции..." oninput="filterProducts()">
+  </div>
+
+  <div class="products-list" id="productsList">
+    <div style="text-align:center; padding: 40px; color: #a1a1aa;">⏳ Загрузка товаров...</div>
+  </div>
+
+  <div class="cart-bar" id="cartBar" style="display: none;">
+    <button class="cart-btn" onclick="openCart()">
+      <span>Корзина (<span id="cartCount">0</span>)</span>
+      <span id="cartTotal">0 ₽</span>
+    </button>
+  </div>
+
+  <div class="modal" id="orderModal">
+    <div class="modal-content">
+      <div class="modal-title">Оформление заказа</div>
+      
+      <div class="order-items-preview" id="orderItemsPreview"></div>
+
+      <div class="form-group">
+        <label>Ваше Имя</label>
+        <input type="text" id="custName" placeholder="Введите имя">
+      </div>
+
+      <div class="form-group">
+        <label>Телефон для связи</label>
+        <input type="tel" id="custPhone" placeholder="+7 (___) ___-__-__">
+      </div>
+
+      <div class="form-group">
+        <label>Удобный способ связи / доставки</label>
+        <select id="custDelivery">
+          <option value="Telegram">Telegram</option>
+          <option value="WhatsApp">WhatsApp</option>
+          <option value="Звонок по телефону">Звонок по телефону</option>
+          <option value="СДЭК / Почта">СДЭК / Почта</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Комментарий к заказу (необязательно)</label>
+        <textarea id="custComment" rows="2" placeholder="Ваши пожелания..."></textarea>
+      </div>
+
+      <button class="submit-btn" onclick="sendOrder()">Отправить заказ менеджеру</button>
+      <button class="close-btn" onclick="closeCart()">← Вернуться к покупкам</button>
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand(); // Разворачиваем WebApp на весь экран
+
+    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1OenmMNDEhjy8N2DcKdoKFvICstfkqIyfP2_cLasdymY/gviz/tq?tqx=out:csv&gid=224867329";
+
+    const WAX_VOLS = ['500кг+', '100-499кг', 'Упаковка', '10-24кг', '5-9кг', '0-4кг'];
+    const MAIN_VOLS = ['1000мл', '500мл', '200мл', '60мл', '33мл', '14мл'];
+
+    let rawProducts = [];
+    let cart = []; // [{ id, title, volume, price, count }]
+
+    // Предзаполнение данных из Telegram
+    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+      const u = tg.initDataUnsafe.user;
+      document.getElementById('custName').value = (u.first_name + ' ' + (u.last_name || '')).trim();
+    }
+
+    function parseCSV(text) {
+      let lines = [];
+      let row = [], curr = '', inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        let c = text[i], next = text[i + 1];
+        if (c === '"') {
+          if (inQuotes && next === '"') { curr += '"'; i++; }
+          else { inQuotes = !inQuotes; }
+        } else if (c === ',' && !inQuotes) {
+          row.push(curr.trim()); curr = '';
+        } else if ((c === '\r' || c === '\n') && !inQuotes) {
+          if (c === '\r' && next === '\n') i++;
+          row.push(curr.trim());
+          if (row.some(x => x.length > 0)) lines.push(row);
+          row = []; curr = '';
+        } else { curr += c; }
+      }
+      if (curr || row.length) {
+        row.push(curr.trim());
+        if (row.some(x => x.length > 0)) lines.push(row);
+      }
+      return lines;
+    }
+
+    async function loadData() {
+      try {
+        const res = await fetch(GOOGLE_SHEET_CSV_URL);
+        const csv = await res.text();
+        const parsed = parseCSV(csv);
+        
+        rawProducts = [];
+        let currentSection = 'wax';
+
+        for (let i = 0; i < parsed.length; i++) {
+          let row = parsed[i].slice(0, 9);
+          while (row.length < 9) row.push('');
+          let text = row.join(' ').toLowerCase();
+
+          if (text.includes('наименование') || text.includes('500кг')) continue;
+
+          if (text.includes('воск') && !/\d+/.test(text)) {
+            currentSection = 'wax';
+            rawProducts.push({ type: 'section', title: 'ВОСК (цена за кг)' });
+            continue;
+          }
+          if (text.includes('коллекция') && !/\d+/.test(text)) {
+            currentSection = 'main';
+            rawProducts.push({ type: 'section', title: 'ОСНОВНАЯ КОЛЛЕКЦИЯ' });
+            continue;
+          }
+
+          if (row[0].trim()) {
+            let isWax = currentSection === 'wax' || /соевый|кокосовый|парафин|воск/i.test(row[0]);
+            let vols = isWax ? WAX_VOLS : MAIN_VOLS;
+            let prices = {};
+
+            vols.forEach((vName, idx) => {
+              let val = row[idx + 1];
+              if (val && /\d+/.test(val)) {
+                prices[vName] = parseInt(val.replace(/\D/g, ''));
+              }
+            });
+
+            if (Object.keys(prices).length > 0) {
+              rawProducts.push({
+                type: 'product',
+                id: i,
+                name: row[0],
+                category: row[7] || '',
+                prices: prices,
+                vols: Object.keys(prices)
+              });
+            }
+          }
+        }
+
+        renderProducts(rawProducts);
+      } catch (e) {
+        document.getElementById('productsList').innerHTML = '<div style="color:#ef4444; text-align:center;">Ошибка загрузки каталога</div>';
+      }
+    }
+
+    function renderProducts(items) {
+      const container = document.getElementById('productsList');
+      container.innerHTML = '';
+
+      items.forEach(item => {
+        if (item.type === 'section') {
+          const sec = document.createElement('div');
+          sec.className = 'section-title';
+          sec.textContent = item.title;
+          container.appendChild(sec);
+        } else if (item.type === 'product') {
+          const defaultVol = item.vols[0];
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.id = `card-${item.id}`;
+          card.dataset.selectedVol = defaultVol;
+
+          let volBtnsHtml = item.vols.map((v, idx) => 
+            `<button class="vol-btn ${idx === 0 ? 'active' : ''}" onclick="selectVol(${item.id}, '${v}', ${item.prices[v]}, this)">${v}</button>`
+          ).join('');
+
+          card.innerHTML = `
+            <div class="card-title">${item.name}</div>
+            <div class="volume-selector">${volBtnsHtml}</div>
+            <div class="card-bottom">
+              <div class="price" id="price-${item.id}">${item.prices[defaultVol]} ₽</div>
+              <button class="add-btn" onclick="addToCart(${item.id}, '${item.name.replace(/'/g, "\\'")}')">+ В корзину</button>
+            </div>
+          `;
+          container.appendChild(card);
+        }
+      });
+    }
+
+    function selectVol(id, vol, price, btn) {
+      const card = document.getElementById(`card-${id}`);
+      card.dataset.selectedVol = vol;
+      card.querySelectorAll('.vol-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(`price-${id}`).textContent = `${price} ₽`;
+    }
+
+    function addToCart(id, name) {
+      const card = document.getElementById(`card-${id}`);
+      const vol = card.dataset.selectedVol;
+      const priceText = document.getElementById(`price-${id}`).textContent;
+      const price = parseInt(priceText);
+
+      const existing = cart.find(x => x.id === id && x.volume === vol);
+      if (existing) {
+        existing.count++;
+      } else {
+        cart.push({ id, title: name, volume: vol, price, count: 1 });
+      }
+
+      updateCartBar();
+      tg.HapticFeedback.impactOccurred('light');
+    }
+
+    function updateCartBar() {
+      const count = cart.reduce((sum, item) => sum + item.count, 0);
+      const total = cart.reduce((sum, item) => sum + (item.price * item.count), 0);
+
+      document.getElementById('cartCount').textContent = count;
+      document.getElementById('cartTotal').textContent = `${total} ₽`;
+
+      document.getElementById('cartBar').style.display = count > 0 ? 'flex' : 'none';
+    }
+
+    function openCart() {
+      const container = document.getElementById('orderItemsPreview');
+      let total = 0;
+      let html = '<b>Состав заказа:</b>';
+
+      cart.forEach((item, idx) => {
+        let sum = item.price * item.count;
+        total += sum;
+        html += `<div style="display:flex; justify-content:space-between; margin-top:4px;">
+          <span>${item.title} (${item.volume}) x ${item.count}</span>
+          <b>${sum} ₽</b>
+        </div>`;
+      });
+
+      html += `<div style="display:flex; justify-content:space-between; margin-top:10px; font-size:15px; border-top:1px solid #3f3f46; padding-top:6px;">
+        <span>Итого:</span><b style="color:#facc15;">${total} ₽</b>
+      </div>`;
+
+      container.innerHTML = html;
+      document.getElementById('orderModal').style.display = 'block';
+    }
+
+    function closeCart() {
+      document.getElementById('orderModal').style.display = 'none';
+    }
+
+    function filterProducts() {
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      const filtered = rawProducts.filter(item => {
+        if (item.type === 'section') return true;
+        return item.name.toLowerCase().includes(q);
+      });
+      renderProducts(filtered);
+    }
+
+    function sendOrder() {
+      const name = document.getElementById('custName').value.trim();
+      const phone = document.getElementById('custPhone').value.trim();
+      const delivery = document.getElementById('custDelivery').value;
+      const comment = document.getElementById('custComment').value.trim();
+
+      if (!name || !phone) {
+        alert('Пожалуйста, укажите ваше имя и телефон!');
+        return;
+      }
+
+      const total = cart.reduce((sum, item) => sum + (item.price * item.count), 0);
+
+      const orderData = {
+        name,
+        phone,
+        delivery,
+        comment,
+        items: cart,
+        total
+      };
+
+      // Передаем данные в Telegram
+      tg.sendData(JSON.stringify(orderData));
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
