@@ -10,7 +10,7 @@ from aiogram.client.session.aiohttp import AiohttpSession
 BOT_TOKEN = "8997817506:AAEYfv6fY2QDLWVaGRxHS3sJjawZIaJlqMk"
 
 # 2. Ваш ID Telegram от @userinfobot (обязательно укажите ваши цифры!)
-MANAGER_CHAT_ID = "471582442" 
+MANAGER_CHAT_ID = 8113113940
 
 # 3. Ссылка на ваш WebApp на GitHub Pages
 WEBAPP_URL = "https://ramalmekhraliev.github.io/venda-bot/"
