@@ -3,11 +3,12 @@ import json
 import logging
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import CommandStart
-from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
+# ВАЖНО: Импортируем ReplyKeyboardMarkup и KeyboardButton вместо Inline
+from aiogram.types import WebAppInfo, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.session.aiohttp import AiohttpSession
 
 BOT_TOKEN = "8997817506:AAEYfv6fY2QDLWVaGRxHS3sJjawZIaJlqMk"
-MANAGER_CHAT_ID = 471582442
+MANAGER_CHAT_ID = 8113113940
 WEBAPP_URL = "https://ramalmekhraliev.github.io/venda-bot/"
 
 session = AiohttpSession(proxy="http://proxy.server:3128")
@@ -16,14 +17,18 @@ dp = Dispatcher()
 
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🛍 Открыть каталог и заказать", web_app=WebAppInfo(url=WEBAPP_URL))]
-    ])
+    # ИСПРАВЛЕНИЕ: Создаем обычную кнопку меню (внизу экрана)
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🛍 Открыть каталог и заказать", web_app=WebAppInfo(url=WEBAPP_URL))]
+        ],
+        resize_keyboard=True
+    )
     
     await message.answer(
         f"Здравствуйте, {message.from_user.first_name}! 👋\n\n"
         f"Добро пожаловать в магазин косметических отдушек **VENDA**.\n\n"
-        f"Нажмите кнопку ниже, чтобы открыть каталог, выбрать нужные объемы и оформить заказ.",
+        f"Нажмите кнопку в меню ниже (там, где вы печатаете текст), чтобы открыть каталог, выбрать нужные объемы и оформить заказ.",
         reply_markup=kb,
         parse_mode="Markdown"
     )
