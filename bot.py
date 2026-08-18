@@ -10,7 +10,6 @@ BOT_TOKEN = "8997817506:AAEYfv6fY2QDLWVaGRxHS3sJjawZIaJlqMk"
 MANAGER_CHAT_ID = 8113113940
 WEBAPP_URL = "https://ramalmekhraliev.github.io/venda-bot/"
 
-# Render автоматически подставит ваш будущий домен
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "https://venda-bot.onrender.com")
 WEBHOOK_PATH = f"/bot/{BOT_TOKEN}"
 WEBHOOK_URL = f"{RENDER_EXTERNAL_URL}{WEBHOOK_PATH}"
@@ -34,6 +33,7 @@ async def start_cmd(message: types.Message):
 
 @dp.message(F.web_app_data)
 async def handle_web_app_data(message: types.Message):
+    print(f"DEBUG: Получены данные от Web App -> {message.web_app_data.data}")
     try:
         data = json.loads(message.web_app_data.data)
         user = message.from_user
@@ -67,12 +67,14 @@ async def handle_web_app_data(message: types.Message):
             [InlineKeyboardButton(text="💬 Написать покупателю", url=f"tg://user?id={user.id}")]
         ])
 
+        print(f"DEBUG: Пытаюсь отправить сообщение менеджеру (Chat ID: {MANAGER_CHAT_ID})...")
         await bot.send_message(
             chat_id=MANAGER_CHAT_ID,
             text=manager_msg,
             parse_mode="HTML",
             reply_markup=manager_kb
         )
+        print("DEBUG: Сообщение менеджеру успешно отправлено!")
 
         await message.answer(
             f"✅ <b>Спасибо, {client_name}! Ваш заказ принят.</b>\n\n"
@@ -81,12 +83,14 @@ async def handle_web_app_data(message: types.Message):
             parse_mode="HTML"
         )
     except Exception as e:
+        print(f"DEBUG ERROR: Ошибка при обработке заказа -> {e}")
         logging.error(f"Ошибка при обработке заказа: {e}")
         await message.answer("⚠️ Произошла ошибка при отправке заказа. Попробуйте еще раз.")
 
 @app.on_event("startup")
 async def on_startup():
     await bot.set_webhook(WEBHOOK_URL)
+    print(f"DEBUG: Вебхук успешно установлен на {WEBHOOK_URL}")
 
 @app.post(WEBHOOK_PATH)
 async def bot_webhook(request: Request):
