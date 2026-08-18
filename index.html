@@ -40,7 +40,7 @@
     
     .form-group { display: flex; flex-direction: column; gap: 6px; }
     .form-group label { font-size: 12px; color: #a1a1aa; font-weight: 600; }
-    .form-group input, .form-group select, .form-group textarea { background: #18181b; border: 1px solid #27272a; padding: 10px; border-radius: 8px; color: #fff; outline: none; font-size: 14px; }
+    .form-group input, .form-group textarea { background: #18181b; border: 1px solid #27272a; padding: 10px; border-radius: 8px; color: #fff; outline: none; font-size: 14px; }
 
     .order-items-preview { font-size: 13px; color: #d4d4d8; border-bottom: 1px solid #27272a; padding-bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
 
@@ -86,18 +86,8 @@
       </div>
 
       <div class="form-group">
-        <label>Удобный способ связи / доставки</label>
-        <select id="custDelivery">
-          <option value="Telegram">Telegram</option>
-          <option value="WhatsApp">WhatsApp</option>
-          <option value="Звонок по телефону">Звонок по телефону</option>
-          <option value="СДЭК / Почта">СДЭК / Почта</option>
-        </select>
-      </div>
-
-      <div class="form-group">
         <label>Комментарий к заказу (необязательно)</label>
-        <textarea id="custComment" rows="2" placeholder="Ваши пожелания..."></textarea>
+        <textarea id="custComment" rows="2" placeholder="Адрес доставки или пожелания..."></textarea>
       </div>
 
       <button class="submit-btn" onclick="sendOrder()">Отправить заказ менеджеру</button>
@@ -106,16 +96,19 @@
   </div>
 
   <script>
-    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-    if (tg) {
-      try { tg.expand(); } catch(e){}
-      if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-        const u = tg.initDataUnsafe.user;
-        document.getElementById('custName').value = (u.first_name + ' ' + (u.last_name || '')).trim();
+    let tg = null;
+    try {
+      if (window.Telegram && window.Telegram.WebApp) {
+        tg = window.Telegram.WebApp;
+        tg.expand();
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+          const u = tg.initDataUnsafe.user;
+          document.getElementById('custName').value = (u.first_name + ' ' + (u.last_name || '')).trim();
+        }
       }
-    }
+    } catch (e) {}
 
-    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1OenmMNDEhjy8N2DcKdoKFvICstfkqIyfP2_cLasdymY/gviz/tq?tqx=out:csv&gid=224867329";
+    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1OenmMNDEhjy8N2DcKdoKFvICstfkqIyfP2_cLasdymY/export?format=csv&gid=224867329";
 
     const WAX_VOLS = ['500кг+', '100-499кг', 'Упаковка', '10-24кг', '5-9кг', '0-4кг'];
     const MAIN_VOLS = ['1000мл', '500мл', '200мл', '60мл', '33мл', '14мл'];
@@ -148,8 +141,10 @@
     }
 
     async function loadData() {
+      const listEl = document.getElementById('productsList');
       try {
-        const res = await fetch(GOOGLE_SHEET_CSV_URL);
+        const res = await fetch(GOOGLE_SHEET_CSV_URL + '&_t=' + Date.now());
+        if (!res.ok) throw new Error('HTTP status ' + res.status);
         const csv = await res.text();
         const parsed = parseCSV(csv);
         
@@ -163,19 +158,20 @@
 
           if (text.includes('наименование') || text.includes('500кг')) continue;
 
-          if (text.includes('воск') && !/\d+/.test(text)) {
-            currentSection = 'wax';
-            rawProducts.push({ type: 'section', title: 'ВОСК (цена за кг)' });
-            continue;
-          }
-          if (text.includes('коллекция') && !/\d+/.test(text)) {
+          if ((text.includes('коллекция') || text.includes('основная')) && !/\d+/.test(text)) {
             currentSection = 'main';
             rawProducts.push({ type: 'section', title: 'ОСНОВНАЯ КОЛЛЕКЦИЯ' });
             continue;
           }
 
+          if (text.includes('воск') && !/\d+/.test(text)) {
+            currentSection = 'wax';
+            rawProducts.push({ type: 'section', title: 'ВОСК (цена за кг)' });
+            continue;
+          }
+
           if (row[0].trim()) {
-            let isWax = currentSection === 'wax' || /соевый|кокосовый|парафин|воск/i.test(row[0]);
+            let isWax = /соевый|кокосовый|парафин/i.test(row[0]) || (currentSection === 'wax' && !text.includes('коллекция'));
             let vols = isWax ? WAX_VOLS : MAIN_VOLS;
             let prices = {};
 
@@ -200,7 +196,7 @@
 
         renderProducts(rawProducts);
       } catch (e) {
-        document.getElementById('productsList').innerHTML = '<div style="color:#ef4444; text-align:center; padding: 20px;">Не удалось загрузить данные из таблицы</div>';
+        if (listEl) listEl.innerHTML = '<div style="color:#ef4444; text-align:center; padding: 20px;">Ошибка загрузки данных: ' + e.message + '</div>';
       }
     }
 
@@ -266,7 +262,7 @@
 
       updateCartBar();
       if (tg && tg.HapticFeedback) {
-        tg.HapticFeedback.impactOccurred('light');
+        try { tg.HapticFeedback.impactOccurred('light'); } catch(e){}
       }
     }
 
@@ -317,7 +313,6 @@
     function sendOrder() {
       const name = document.getElementById('custName').value.trim();
       const phone = document.getElementById('custPhone').value.trim();
-      const delivery = document.getElementById('custDelivery').value;
       const comment = document.getElementById('custComment').value.trim();
 
       if (!name || !phone) {
@@ -326,7 +321,7 @@
       }
 
       const total = cart.reduce((sum, item) => sum + (item.price * item.count), 0);
-      const orderData = { name, phone, delivery, comment, items: cart, total };
+      const orderData = { name, phone, comment, items: cart, total };
 
       if (tg && tg.sendData) {
         tg.sendData(JSON.stringify(orderData));
@@ -335,7 +330,7 @@
       }
     }
 
-    loadData();
+    document.addEventListener('DOMContentLoaded', loadData);
   </script>
 </body>
 </html>
