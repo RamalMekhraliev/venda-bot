@@ -1,4 +1,361 @@
-function sendOrder() {
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VENDA | Заказ</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #0d0d0f; color: #f4f4f5; padding-bottom: 90px; }
+
+    header { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: #121214; border-bottom: 1px solid #27272a; position: sticky; top: 0; z-index: 100; }
+    .logo { font-size: 22px; font-weight: 900; color: #facc15; letter-spacing: 2px; }
+    
+    .search-box { padding: 12px 16px; }
+    .search-box input { width: 100%; background: #18181b; border: 1px solid #27272a; padding: 10px 14px; border-radius: 10px; color: #fff; font-size: 14px; outline: none; }
+
+    .products-list { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+    
+    .section-title { color: #facc15; font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px; padding: 8px 12px; background: rgba(250, 204, 21, 0.1); border-radius: 8px; }
+
+    .card { background: #18181b; border: 1px solid #27272a; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .card-title { font-weight: 700; font-size: 15px; color: #fff; }
+    
+    .volume-selector { display: flex; gap: 6px; flex-wrap: wrap; }
+    .vol-btn { background: #27272a; border: 1px solid #3f3f46; color: #a1a1aa; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .vol-btn.active { background: rgba(250, 204, 21, 0.2); color: #fef08a; border-color: #facc15; }
+
+    .card-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+    .price { font-size: 16px; font-weight: 800; color: #fff; }
+
+    .add-btn { background: #ffffff; color: #09090b; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; }
+
+    .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #121214; border-top: 1px solid #27272a; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; z-index: 200; }
+    .cart-btn { background: #facc15; color: #09090b; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 800; font-size: 15px; cursor: pointer; width: 100%; display: flex; justify-content: space-between; }
+
+    .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 300; padding: 20px; overflow-y: auto; }
+    .modal-content { background: #121214; border: 1px solid #27272a; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .modal-title { font-size: 18px; font-weight: 800; color: #fff; }
+    
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 12px; color: #a1a1aa; font-weight: 600; }
+    .form-group input, .form-group textarea { background: #18181b; border: 1px solid #27272a; padding: 10px; border-radius: 8px; color: #fff; outline: none; font-size: 14px; }
+
+    /* Стили для новых кнопок в корзине */
+    .order-items-preview { font-size: 14px; color: #d4d4d8; border-bottom: 1px solid #27272a; padding-bottom: 10px; display: flex; flex-direction: column; }
+    .cart-item-row { padding: 10px 0; border-bottom: 1px solid #27272a; }
+    .cart-item-row:last-child { border-bottom: none; }
+    .cart-item-header { display: flex; justify-content: space-between; align-items: flex-start; color: #fff; }
+    .cart-item-controls { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+    .qty-btn { background: #27272a; color: #f4f4f5; border: 1px solid #3f3f46; border-radius: 6px; width: 28px; height: 28px; font-size: 16px; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+    .remove-btn { background: none; border: none; color: #ef4444; font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; }
+
+    .submit-btn { background: #facc15; color: #09090b; border: none; padding: 14px; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; }
+    .submit-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+    .close-btn { background: transparent; color: #a1a1aa; border: none; padding: 8px; font-weight: 600; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">VENDA</div>
+    <div style="font-size: 12px; color: #a1a1aa;">Онлайн-заказ</div>
+  </header>
+
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Поиск аромата или позиции..." oninput="filterProducts()">
+  </div>
+
+  <div class="products-list" id="productsList">
+    <div style="text-align:center; padding: 40px; color: #a1a1aa;">⏳ Загрузка товаров...</div>
+  </div>
+
+  <div class="cart-bar" id="cartBar" style="display: none;">
+    <button class="cart-btn" onclick="openCart()">
+      <span>Корзина (<span id="cartCount">0</span>)</span>
+      <span id="cartTotal">0 ₽</span>
+    </button>
+  </div>
+
+  <div class="modal" id="orderModal">
+    <div class="modal-content">
+      <div class="modal-title">Оформление заказа</div>
+      <div class="order-items-preview" id="orderItemsPreview"></div>
+
+      <div class="form-group">
+        <label>Ваше Имя</label>
+        <input type="text" id="custName" placeholder="Введите имя">
+      </div>
+
+      <div class="form-group">
+        <label>Телефон</label>
+        <input type="tel" id="custPhone" placeholder="+7 (___) ___-__-__">
+      </div>
+
+      <div class="form-group">
+        <label>Комментарий к заказу (необязательно)</label>
+        <textarea id="custComment" rows="2" placeholder=""></textarea>
+      </div>
+
+      <button class="submit-btn" id="sendBtn" onclick="sendOrder()">Отправить заказ менеджеру</button>
+      <button class="close-btn" onclick="closeCart()">← Вернуться к покупкам</button>
+    </div>
+  </div>
+
+  <script>
+    let tg = null;
+    try {
+      if (window.Telegram && window.Telegram.WebApp) {
+        tg = window.Telegram.WebApp;
+        tg.expand();
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+          const u = tg.initDataUnsafe.user;
+          document.getElementById('custName').value = (u.first_name + ' ' + (u.last_name || '')).trim();
+        }
+      }
+    } catch (e) {}
+
+    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1OenmMNDEhjy8N2DcKdoKFvICstfkqIyfP2_cLasdymY/export?format=csv&gid=224867329";
+
+    const WAX_VOLS = ['500кг+', '100-499кг', 'Упаковка', '10-24кг', '5-9кг', '0-4кг'];
+    const MAIN_VOLS = ['1000мл', '500мл', '200мл', '60мл', '33мл', '14мл'];
+
+    let rawProducts = [];
+    let cart = [];
+
+    function parseCSV(text) {
+      let lines = [];
+      let row = [], curr = '', inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        let c = text[i], next = text[i + 1];
+        if (c === '"') {
+          if (inQuotes && next === '"') { curr += '"'; i++; }
+          else { inQuotes = !inQuotes; }
+        } else if (c === ',' && !inQuotes) {
+          row.push(curr.trim()); curr = '';
+        } else if ((c === '\r' || c === '\n') && !inQuotes) {
+          if (c === '\r' && next === '\n') i++;
+          row.push(curr.trim());
+          if (row.some(x => x.length > 0)) lines.push(row);
+          row = []; curr = '';
+        } else { curr += c; }
+      }
+      if (curr || row.length) {
+        row.push(curr.trim());
+        if (row.some(x => x.length > 0)) lines.push(row);
+      }
+      return lines;
+    }
+
+    async function loadData() {
+      const listEl = document.getElementById('productsList');
+      try {
+        const res = await fetch(GOOGLE_SHEET_CSV_URL + '&_t=' + Date.now());
+        if (!res.ok) throw new Error('HTTP status ' + res.status);
+        const csv = await res.text();
+        const parsed = parseCSV(csv);
+        
+        rawProducts = [];
+        let currentSection = 'wax';
+
+        for (let i = 0; i < parsed.length; i++) {
+          let row = parsed[i].slice(0, 9);
+          while (row.length < 9) row.push('');
+          let text = row.join(' ').toLowerCase();
+
+          if (text.includes('наименование') || text.includes('500кг')) continue;
+
+          if ((text.includes('коллекция') || text.includes('основная')) && !/\d+/.test(text)) {
+            currentSection = 'main';
+            rawProducts.push({ type: 'section', title: 'ОСНОВНАЯ КОЛЛЕКЦИЯ' });
+            continue;
+          }
+
+          if (text.includes('воск') && !/\d+/.test(text)) {
+            currentSection = 'wax';
+            rawProducts.push({ type: 'section', title: 'ВОСК (цена за кг)' });
+            continue;
+          }
+
+          if (row[0].trim()) {
+            let isWax = /соевый|кокосовый|парафин/i.test(row[0]) || (currentSection === 'wax' && !text.includes('коллекция'));
+            let vols = isWax ? WAX_VOLS : MAIN_VOLS;
+            let prices = {};
+
+            vols.forEach((vName, idx) => {
+              let val = row[idx + 1];
+              if (val && /\d+/.test(val)) {
+                prices[vName] = parseInt(val.replace(/\D/g, ''));
+              }
+            });
+
+            if (Object.keys(prices).length > 0) {
+              rawProducts.push({
+                type: 'product',
+                id: i,
+                name: row[0],
+                prices: prices,
+                vols: Object.keys(prices)
+              });
+            }
+          }
+        }
+
+        renderProducts(rawProducts);
+      } catch (e) {
+        if (listEl) listEl.innerHTML = '<div style="color:#ef4444; text-align:center; padding: 20px;">Ошибка загрузки данных: ' + e.message + '</div>';
+      }
+    }
+
+    function renderProducts(items) {
+      const container = document.getElementById('productsList');
+      container.innerHTML = '';
+
+      if (!items.length) {
+        container.innerHTML = '<div style="text-align:center; color:#a1a1aa; padding: 20px;">Ничего не найдено</div>';
+        return;
+      }
+
+      items.forEach(item => {
+        if (item.type === 'section') {
+          const sec = document.createElement('div');
+          sec.className = 'section-title';
+          sec.textContent = item.title;
+          container.appendChild(sec);
+        } else if (item.type === 'product') {
+          const defaultVol = item.vols[0];
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.id = `card-${item.id}`;
+          card.dataset.selectedVol = defaultVol;
+
+          let volBtnsHtml = item.vols.map((v, idx) => 
+            `<button class="vol-btn ${idx === 0 ? 'active' : ''}" onclick="selectVol(${item.id}, '${v}', ${item.prices[v]}, this)">${v}</button>`
+          ).join('');
+
+          card.innerHTML = `
+            <div class="card-title">${item.name}</div>
+            <div class="volume-selector">${volBtnsHtml}</div>
+            <div class="card-bottom">
+              <div class="price" id="price-${item.id}">${item.prices[defaultVol]} ₽</div>
+              <button class="add-btn" onclick="addToCart(${item.id}, '${item.name.replace(/'/g, "\\'")}')">+ В корзину</button>
+            </div>
+          `;
+          container.appendChild(card);
+        }
+      });
+    }
+
+    function selectVol(id, vol, price, btn) {
+      const card = document.getElementById(`card-${id}`);
+      card.dataset.selectedVol = vol;
+      card.querySelectorAll('.vol-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(`price-${id}`).textContent = `${price} ₽`;
+    }
+
+    function addToCart(id, name) {
+      const card = document.getElementById(`card-${id}`);
+      const vol = card.dataset.selectedVol;
+      const priceText = document.getElementById(`price-${id}`).textContent;
+      const price = parseInt(priceText);
+
+      const existing = cart.find(x => x.id === id && x.volume === vol);
+      if (existing) {
+        existing.count++;
+      } else {
+        cart.push({ id, title: name, volume: vol, price, count: 1 });
+      }
+
+      updateCartBar();
+      if (tg && tg.HapticFeedback) {
+        try { tg.HapticFeedback.impactOccurred('light'); } catch(e){}
+      }
+    }
+
+    function updateCartBar() {
+      const count = cart.reduce((sum, item) => sum + item.count, 0);
+      const total = cart.reduce((sum, item) => sum + (item.price * item.count), 0);
+
+      document.getElementById('cartCount').textContent = count;
+      document.getElementById('cartTotal').textContent = `${total} ₽`;
+      document.getElementById('cartBar').style.display = count > 0 ? 'flex' : 'none';
+    }
+
+    // Изменение количества товара в корзине
+    function updateQty(id, vol, delta) {
+      const item = cart.find(x => x.id === id && x.volume === vol);
+      if (item) {
+        item.count += delta;
+        if (item.count <= 0) {
+          removeFromCart(id, vol);
+          return;
+        }
+      }
+      updateCartBar();
+      openCart(); // Перерисовываем корзину
+    }
+
+    // Удаление товара из корзины
+    function removeFromCart(id, vol) {
+      cart = cart.filter(x => !(x.id === id && x.volume === vol));
+      updateCartBar();
+      if (cart.length === 0) {
+        closeCart(); // Закрываем, если корзина опустела
+      } else {
+        openCart(); // Перерисовываем корзину
+      }
+    }
+
+    function openCart() {
+      const container = document.getElementById('orderItemsPreview');
+      if (cart.length === 0) return;
+
+      let total = 0;
+      let html = '<b style="margin-bottom: 8px; display: block;">Состав заказа:</b>';
+
+      cart.forEach(item => {
+        let sum = item.price * item.count;
+        total += sum;
+        html += `
+        <div class="cart-item-row">
+          <div class="cart-item-header">
+            <span>${item.title} (${item.volume})</span>
+            <button class="remove-btn" onclick="removeFromCart(${item.id}, '${item.volume}')">×</button>
+          </div>
+          <div class="cart-item-controls">
+            <button class="qty-btn" onclick="updateQty(${item.id}, '${item.volume}', -1)">-</button>
+            <span>${item.count}</span>
+            <button class="qty-btn" onclick="updateQty(${item.id}, '${item.volume}', 1)">+</button>
+            <b style="margin-left:auto;">${sum} ₽</b>
+          </div>
+        </div>`;
+      });
+
+      html += `
+      <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:16px; border-top:1px solid #3f3f46; padding-top:10px;">
+        <span>Итого:</span><b style="color:#facc15;">${total} ₽</b>
+      </div>`;
+
+      container.innerHTML = html;
+      document.getElementById('orderModal').style.display = 'block';
+    }
+
+    function closeCart() {
+      document.getElementById('orderModal').style.display = 'none';
+    }
+
+    function filterProducts() {
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      const filtered = rawProducts.filter(item => {
+        if (item.type === 'section') return true;
+        return item.name.toLowerCase().includes(q);
+      });
+      renderProducts(filtered);
+    }
+
+    function sendOrder() {
       const name = document.getElementById('custName').value.trim();
       const phone = document.getElementById('custPhone').value.trim();
       const comment = document.getElementById('custComment').value.trim();
@@ -32,3 +389,8 @@ function sendOrder() {
         btn.textContent = 'Отправить заказ менеджеру';
       }
     }
+
+    document.addEventListener('DOMContentLoaded', loadData);
+  </script>
+</body>
+</html>
