@@ -6,13 +6,13 @@ from aiogram.filters import CommandStart
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 
 # 1. Токен бота от @BotFather
-BOT_TOKEN = "ВАШ_ТОКЕН_БОТА_ЗДЕСЬ"
+BOT_TOKEN = "8997817506:AAHEweQKDjKsFh5UolU0ogG4cRY_DJmRTlQ"
 
 # 2. Ваш ID Telegram от @userinfobot (куда приходят заказы)
 MANAGER_CHAT_ID = 123456789 
 
 # 3. Ссылка на опубликованный WebApp (инструкция ниже)
-WEBAPP_URL = "https://ваш-аккаунт.github.io/venda-bot/"
+WEBAPP_URL = "https://ramalmekhraliev.github.io/venda-bot/"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
