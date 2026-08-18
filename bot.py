@@ -6,13 +6,16 @@ from aiogram.filters import CommandStart
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.session.aiohttp import AiohttpSession
 
+# 1. Токен бота от @BotFather
 BOT_TOKEN = "8997817506:AAEYfv6fY2QDLWVaGRxHS3sJjawZIaJlqMk"
 
-# ВАЖНО: Укажите ваш личный ID в Telegram (узнать можно в @userinfobot)
-MANAGER_CHAT_ID = 471582442  
+# 2. Ваш ID Telegram от @userinfobot (обязательно укажите ваши цифры!)
+MANAGER_CHAT_ID = "471582442" 
 
+# 3. Ссылка на ваш WebApp на GitHub Pages
 WEBAPP_URL = "https://ramalmekhraliev.github.io/venda-bot/"
 
+# Прокси для бесплатного тарифа PythonAnywhere
 session = AiohttpSession(proxy="http://proxy.server:3128")
 bot = Bot(token=BOT_TOKEN, session=session)
 dp = Dispatcher()
@@ -50,7 +53,7 @@ async def handle_web_app_data(message: types.Message):
 
         username_str = f"@{user.username}" if user.username else "Username не задан"
 
-        msg_body = (
+        manager_msg = (
             f"🛍 <b>НОВЫЙ ЗАКАЗ VENDA!</b>\n"
             f"──────────────────\n"
             f"👤 <b>Клиент:</b> {client_name}\n"
@@ -67,29 +70,23 @@ async def handle_web_app_data(message: types.Message):
             [InlineKeyboardButton(text="💬 Написать покупателю", url=f"tg://user?id={user.id}")]
         ])
 
-        # 1. Отправка менеджеру
-        try:
-            await bot.send_message(
-                chat_id=MANAGER_CHAT_ID,
-                text=msg_body,
-                parse_mode="HTML",
-                reply_markup=manager_kb
-            )
-        except Exception as err:
-            logging.error(f"Не удалось отправить менеджеру: {err}")
+        await bot.send_message(
+            chat_id=MANAGER_CHAT_ID,
+            text=manager_msg,
+            parse_mode="HTML",
+            reply_markup=manager_kb
+        )
 
-        # 2. Подтверждение покупателю
         await message.answer(
-            f"✅ <b>Спасибо, {client_name}! Ваш заказ успешно принят.</b>\n\n"
-            f"{items_text}\n"
-            f"💰 <b>Сумма к оплате: {total_sum} ₽</b>\n\n"
-            f"Менеджер свяжется с вами в ближайшее время для уточнения деталей.",
+            f"✅ <b>Спасибо, {client_name}! Ваш заказ принят.</b>\n\n"
+            f"Сумма заказа: <b>{total_sum} ₽</b>\n"
+            f"Менеджер свяжется с вами в течение нескольких минут для подтверждения.",
             parse_mode="HTML"
         )
 
     except Exception as e:
         logging.error(f"Ошибка при обработке заказа: {e}")
-        await message.answer("⚠️ Произошла ошибка при обработке заказа. Попробуйте еще раз.")
+        await message.answer("⚠️ Произошла ошибка при отправке заказа. Попробуйте еще раз.")
 
 async def main():
     logging.basicConfig(level=logging.INFO)
