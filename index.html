@@ -113,16 +113,45 @@
           const u = tg.initDataUnsafe.user;
           document.getElementById('custName').value = (u.first_name + ' ' + (u.last_name || '')).trim();
         }
+        // Убираем системный экран загрузки Telegram сразу после готовности интерфейса.
+        tg.ready();
       }
     } catch (e) {}
 
     const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1OenmMNDEhjy8N2DcKdoKFvICstfkqIyfP2_cLasdymY/export?format=csv&gid=224867329";
+    const STATIC_PRODUCTS_URL = './products.csv';
+    const PRODUCTS_CACHE_KEY = 'venda_products_cache_v1';
 
     const WAX_VOLS = ['500кг+', '100-499кг', 'Упаковка', '10-24кг', '5-9кг', '0-4кг'];
     const MAIN_VOLS = ['1000мл', '500мл', '200мл', '60мл', '33мл', '14мл'];
 
     let rawProducts = [];
     let cart = [];
+
+    function loadProductsFromCache() {
+      try {
+        const cached = JSON.parse(localStorage.getItem(PRODUCTS_CACHE_KEY));
+        if (cached && Array.isArray(cached.products) && cached.products.length > 0) {
+          rawProducts = cached.products;
+          renderProducts(rawProducts);
+          return true;
+        }
+      } catch (e) {
+        localStorage.removeItem(PRODUCTS_CACHE_KEY);
+      }
+      return false;
+    }
+
+    function saveProductsToCache(products) {
+      try {
+        localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify({
+          products,
+          savedAt: Date.now()
+        }));
+      } catch (e) {
+        // Каталог продолжит работать, даже если хранилище устройства недоступно.
+      }
+    }
 
     function parseCSV(text) {
       let lines = [];
@@ -148,63 +177,96 @@
       return lines;
     }
 
-    async function loadData() {
-      const listEl = document.getElementById('productsList');
-      try {
-        const res = await fetch(GOOGLE_SHEET_CSV_URL + '&_t=' + Date.now());
-        if (!res.ok) throw new Error('HTTP status ' + res.status);
-        const csv = await res.text();
-        const parsed = parseCSV(csv);
-        
-        rawProducts = [];
-        let currentSection = 'wax';
+    function buildProducts(parsed) {
+      const products = [];
+      let currentSection = 'wax';
 
-        for (let i = 0; i < parsed.length; i++) {
-          let row = parsed[i].slice(0, 9);
-          while (row.length < 9) row.push('');
-          let text = row.join(' ').toLowerCase();
+      for (let i = 0; i < parsed.length; i++) {
+        let row = parsed[i].slice(0, 9);
+        while (row.length < 9) row.push('');
+        let text = row.join(' ').toLowerCase();
 
-          if (text.includes('наименование') || text.includes('500кг')) continue;
+        if (text.includes('наименование') || text.includes('500кг')) continue;
 
-          if ((text.includes('коллекция') || text.includes('основная')) && !/\d+/.test(text)) {
-            currentSection = 'main';
-            rawProducts.push({ type: 'section', title: 'ОСНОВНАЯ КОЛЛЕКЦИЯ' });
-            continue;
-          }
-
-          if (text.includes('воск') && !/\d+/.test(text)) {
-            currentSection = 'wax';
-            rawProducts.push({ type: 'section', title: 'ВОСК (цена за кг)' });
-            continue;
-          }
-
-          if (row[0].trim()) {
-            let isWax = /соевый|кокосовый|парафин/i.test(row[0]) || (currentSection === 'wax' && !text.includes('коллекция'));
-            let vols = isWax ? WAX_VOLS : MAIN_VOLS;
-            let prices = {};
-
-            vols.forEach((vName, idx) => {
-              let val = row[idx + 1];
-              if (val && /\d+/.test(val)) {
-                prices[vName] = parseInt(val.replace(/\D/g, ''));
-              }
-            });
-
-            if (Object.keys(prices).length > 0) {
-              rawProducts.push({
-                type: 'product',
-                id: i,
-                name: row[0],
-                prices: prices,
-                vols: Object.keys(prices)
-              });
-            }
-          }
+        if ((text.includes('коллекция') || text.includes('основная')) && !/\d+/.test(text)) {
+          currentSection = 'main';
+          products.push({ type: 'section', title: 'ОСНОВНАЯ КОЛЛЕКЦИЯ' });
+          continue;
         }
 
-        renderProducts(rawProducts);
+        if (text.includes('воск') && !/\d+/.test(text)) {
+          currentSection = 'wax';
+          products.push({ type: 'section', title: 'ВОСК (цена за кг)' });
+          continue;
+        }
+
+        if (row[0].trim()) {
+          let isWax = /соевый|кокосовый|парафин/i.test(row[0]) || (currentSection === 'wax' && !text.includes('коллекция'));
+          let vols = isWax ? WAX_VOLS : MAIN_VOLS;
+          let prices = {};
+
+          vols.forEach((vName, idx) => {
+            let val = row[idx + 1];
+            if (val && /\d+/.test(val)) {
+              prices[vName] = parseInt(val.replace(/\D/g, ''));
+            }
+          });
+
+          if (Object.keys(prices).length > 0) {
+            products.push({
+              type: 'product',
+              id: i,
+              name: row[0],
+              prices: prices,
+              vols: Object.keys(prices)
+            });
+          }
+        }
+      }
+
+      return products;
+    }
+
+    async function fetchProducts(url, options = {}) {
+      const res = await fetch(url, options);
+      if (!res.ok) throw new Error('HTTP status ' + res.status);
+      const csv = await res.text();
+      const products = buildProducts(parseCSV(csv));
+      if (!products.length) throw new Error('В таблице не найдены товары');
+      return products;
+    }
+
+    function showAndCacheProducts(products) {
+      rawProducts = products;
+      renderProducts(rawProducts);
+      saveProductsToCache(rawProducts);
+    }
+
+    async function loadData() {
+      const listEl = document.getElementById('productsList');
+      // При повторном открытии показываем предыдущий каталог без ожидания сети.
+      let hasProducts = loadProductsFromCache();
+
+      // Новый покупатель получает снимок цен с того же быстрого Render CDN.
+      if (!hasProducts) {
+        try {
+          const staticProducts = await fetchProducts(STATIC_PRODUCTS_URL, { cache: 'force-cache' });
+          showAndCacheProducts(staticProducts);
+          hasProducts = true;
+        } catch (e) {
+          console.warn('Не удалось загрузить CDN-копию каталога:', e);
+        }
+      }
+
+      try {
+        // Свежие цены загружаются в фоне и заменяют кэш после получения ответа.
+        const freshProducts = await fetchProducts(GOOGLE_SHEET_CSV_URL, { cache: 'no-store' });
+        showAndCacheProducts(freshProducts);
       } catch (e) {
-        if (listEl) listEl.innerHTML = '<div style="color:#ef4444; text-align:center; padding: 20px;">Ошибка загрузки данных: ' + e.message + '</div>';
+        console.error('Не удалось обновить каталог:', e);
+        if (!hasProducts && listEl) {
+          listEl.innerHTML = '<div style="color:#ef4444; text-align:center; padding: 20px;">Ошибка загрузки данных: ' + e.message + '</div>';
+        }
       }
     }
 
