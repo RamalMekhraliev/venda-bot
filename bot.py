@@ -8,10 +8,10 @@ from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 # 1. Токен бота от @BotFather
 BOT_TOKEN = "8997817506:AAHEweQKDjKsFh5UolU0ogG4cRY_DJmRTlQ"
 
-# 2. Ваш ID Telegram от @userinfobot (куда приходят заказы)
+# 2. Ваш ID Telegram от @userinfobot (замените на ваш ID)
 MANAGER_CHAT_ID = 123456789 
 
-# 3. Ссылка на опубликованный WebApp (инструкция ниже)
+# 3. Ссылка на опубликованный WebApp на GitHub Pages
 WEBAPP_URL = "https://ramalmekhraliev.github.io/venda-bot/"
 
 bot = Bot(token=BOT_TOKEN)
@@ -19,7 +19,6 @@ dp = Dispatcher()
 
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
-    # Кнопка открытия витрины
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🛍 Открыть каталог и заказать", web_app=WebAppInfo(url=WEBAPP_URL))]
     ])
@@ -32,7 +31,6 @@ async def start_cmd(message: types.Message):
         parse_mode="Markdown"
     )
 
-# Обработка полученного заказа из WebApp
 @dp.message(F.web_app_data)
 async def handle_web_app_data(message: types.Message):
     try:
@@ -41,12 +39,10 @@ async def handle_web_app_data(message: types.Message):
         user = message.from_user
         client_name = data.get("name", user.full_name)
         client_phone = data.get("phone", "Не указан")
-        client_delivery = data.get("delivery", "Не указан")
         client_comment = data.get("comment", "—")
         items = data.get("items", [])
         total_sum = data.get("total", 0)
 
-        # Формируем список товаров
         items_text = ""
         for idx, item in enumerate(items, 1):
             sum_item = item['price'] * item['count']
@@ -54,27 +50,23 @@ async def handle_web_app_data(message: types.Message):
 
         username_str = f"@{user.username}" if user.username else "Username не задан"
 
-        # Формируем сообщение менеджеру
         manager_msg = (
-          f"🛍 <b>НОВЫЙ ЗАКАЗ VENDA!</b>\n"
-          f"──────────────────\n"
-          f"👤 <b>Клиент:</b> {client_name}\n"
-          f"📱 <b>Телефон:</b> <code>{client_phone}</code>\n"
-          f"✈️ <b>Профиль ТГ:</b> {username_str}\n"
-          f"🚚 <b>Связь / Доставка:</b> {client_delivery}\n"
-          f"💬 <b>Комментарий:</b> {client_comment}\n"
-          f"──────────────────\n"
-          f"📦 <b>Состав заказа:</b>\n\n"
-          f"{items_text}\n"
-          f"💰 <b>ИТОГО К ОПЛАТЕ: {total_sum} ₽</b>"
+            f"🛍 <b>НОВЫЙ ЗАКАЗ VENDA!</b>\n"
+            f"──────────────────\n"
+            f"👤 <b>Клиент:</b> {client_name}\n"
+            f"📱 <b>Телефон:</b> <code>{client_phone}</code>\n"
+            f"✈️ <b>Профиль ТГ:</b> {username_str}\n"
+            f"💬 <b>Комментарий:</b> {client_comment}\n"
+            f"──────────────────\n"
+            f"📦 <b>Состав заказа:</b>\n\n"
+            f"{items_text}\n"
+            f"💰 <b>ИТОГО К ОПЛАТЕ: {total_sum} ₽</b>"
         )
 
-        # Кнопка для мгновенного перехода в диалог с покупателем
         manager_kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="💬 Написать покупателю", url=f"tg://user?id={user.id}")]
         ])
 
-        # 1. Отправка менеджеру
         await bot.send_message(
             chat_id=MANAGER_CHAT_ID,
             text=manager_msg,
@@ -82,7 +74,6 @@ async def handle_web_app_data(message: types.Message):
             reply_markup=manager_kb
         )
 
-        # 2. Подтверждение покупателю
         await message.answer(
             f"✅ <b>Спасибо, {client_name}! Ваш заказ принят.</b>\n\n"
             f"Сумма заказа: <b>{total_sum} ₽</b>\n"
@@ -92,7 +83,7 @@ async def handle_web_app_data(message: types.Message):
 
     except Exception as e:
         logging.error(f"Ошибка при обработке заказа: {e}")
-        await message.answer("⚠️ Произошла ошибка при отправке заказа. Пожалуйста, попробуйте ещё раз.")
+        await message.answer("⚠️ Произошла ошибка при отправке заказа. Попробуйте еще раз.")
 
 async def main():
     logging.basicConfig(level=logging.INFO)
