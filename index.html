@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VENDA | Заказ</title>
-  <script src="./telegram-web-app.js" onerror="this.onerror=null;this.src='https://telegram.org/js/telegram-web-app.js';"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #0d0d0f; color: #f4f4f5; padding-bottom: 90px; }
@@ -105,18 +104,75 @@
 
   <script>
     let tg = null;
-    try {
-      if (window.Telegram && window.Telegram.WebApp) {
+    let telegramReadyPromise = null;
+
+    function configureTelegram() {
+      try {
+        if (!window.Telegram || !window.Telegram.WebApp) return false;
         tg = window.Telegram.WebApp;
         tg.expand();
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
           const u = tg.initDataUnsafe.user;
           document.getElementById('custName').value = (u.first_name + ' ' + (u.last_name || '')).trim();
         }
-        // Убираем системный экран загрузки Telegram сразу после готовности интерфейса.
         tg.ready();
+        return true;
+      } catch (e) {
+        console.error('Ошибка инициализации Telegram SDK:', e);
+        return false;
       }
-    } catch (e) {}
+    }
+
+    function loadTelegramSdk() {
+      if (configureTelegram()) return Promise.resolve(true);
+      if (telegramReadyPromise) return telegramReadyPromise;
+
+      telegramReadyPromise = new Promise(resolve => {
+        const sources = [
+          './telegram-web-app.js',
+          'https://telegram.org/js/telegram-web-app.js'
+        ];
+        let sourceIndex = 0;
+
+        function tryNextSource() {
+          if (sourceIndex >= sources.length) {
+            resolve(false);
+            return;
+          }
+
+          const script = document.createElement('script');
+          script.src = sources[sourceIndex++];
+          script.async = true;
+          let finished = false;
+
+          const finishAttempt = success => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timeoutId);
+            script.onload = null;
+            script.onerror = null;
+            if (success && configureTelegram()) {
+              resolve(true);
+            } else {
+              script.remove();
+              tryNextSource();
+            }
+          };
+
+          const timeoutId = setTimeout(() => finishAttempt(false), 15000);
+          script.onload = () => finishAttempt(true);
+          script.onerror = () => finishAttempt(false);
+          document.head.appendChild(script);
+        }
+
+        tryNextSource();
+      });
+
+      return telegramReadyPromise;
+    }
+
+    // Загружаем SDK параллельно с каталогом, не блокируя показ интерфейса.
+    loadTelegramSdk();
 
     const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1OenmMNDEhjy8N2DcKdoKFvICstfkqIyfP2_cLasdymY/export?format=csv&gid=224867329";
     const STATIC_PRODUCTS_URL = './products.csv';
@@ -434,8 +490,14 @@
         return;
       }
 
-      if (!tg || !tg.initData) {
-        alert('Откройте каталог через новую кнопку после команды /start в Telegram.');
+      const telegramLoaded = await loadTelegramSdk();
+      if (!telegramLoaded || !tg) {
+        alert('Не удалось загрузить Telegram SDK. Закройте каталог и откройте его ещё раз.');
+        return;
+      }
+
+      if (!tg.initData) {
+        alert('Telegram не передал данные авторизации. Закройте каталог, отправьте /start и используйте новую кнопку.');
         return;
       }
 
