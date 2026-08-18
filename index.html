@@ -42,9 +42,17 @@
     .form-group label { font-size: 12px; color: #a1a1aa; font-weight: 600; }
     .form-group input, .form-group textarea { background: #18181b; border: 1px solid #27272a; padding: 10px; border-radius: 8px; color: #fff; outline: none; font-size: 14px; }
 
-    .order-items-preview { font-size: 13px; color: #d4d4d8; border-bottom: 1px solid #27272a; padding-bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
+    /* Стили для новых кнопок в корзине */
+    .order-items-preview { font-size: 14px; color: #d4d4d8; border-bottom: 1px solid #27272a; padding-bottom: 10px; display: flex; flex-direction: column; }
+    .cart-item-row { padding: 10px 0; border-bottom: 1px solid #27272a; }
+    .cart-item-row:last-child { border-bottom: none; }
+    .cart-item-header { display: flex; justify-content: space-between; align-items: flex-start; color: #fff; }
+    .cart-item-controls { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+    .qty-btn { background: #27272a; color: #f4f4f5; border: 1px solid #3f3f46; border-radius: 6px; width: 28px; height: 28px; font-size: 16px; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+    .remove-btn { background: none; border: none; color: #ef4444; font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; }
 
     .submit-btn { background: #facc15; color: #09090b; border: none; padding: 14px; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; }
+    .submit-btn:disabled { opacity: 0.7; cursor: not-allowed; }
     .close-btn { background: transparent; color: #a1a1aa; border: none; padding: 8px; font-weight: 600; cursor: pointer; }
   </style>
 </head>
@@ -90,7 +98,7 @@
         <textarea id="custComment" rows="2" placeholder=""></textarea>
       </div>
 
-      <button class="submit-btn" onclick="sendOrder()">Отправить заказ менеджеру</button>
+      <button class="submit-btn" id="sendBtn" onclick="sendOrder()">Отправить заказ менеджеру</button>
       <button class="close-btn" onclick="closeCart()">← Вернуться к покупкам</button>
     </div>
   </div>
@@ -275,62 +283,60 @@
       document.getElementById('cartBar').style.display = count > 0 ? 'flex' : 'none';
     }
 
+    // Изменение количества товара в корзине
+    function updateQty(id, vol, delta) {
+      const item = cart.find(x => x.id === id && x.volume === vol);
+      if (item) {
+        item.count += delta;
+        if (item.count <= 0) {
+          removeFromCart(id, vol);
+          return;
+        }
+      }
+      updateCartBar();
+      openCart(); // Перерисовываем корзину
+    }
+
+    // Удаление товара из корзины
+    function removeFromCart(id, vol) {
+      cart = cart.filter(x => !(x.id === id && x.volume === vol));
+      updateCartBar();
+      if (cart.length === 0) {
+        closeCart(); // Закрываем, если корзина опустела
+      } else {
+        openCart(); // Перерисовываем корзину
+      }
+    }
+
     function openCart() {
       const container = document.getElementById('orderItemsPreview');
+      if (cart.length === 0) return;
+
       let total = 0;
-      let html = '<b>Состав заказа:</b>';
+      let html = '<b style="margin-bottom: 8px; display: block;">Состав заказа:</b>';
 
       cart.forEach(item => {
         let sum = item.price * item.count;
         total += sum;
-        html += `<div style="display:flex; justify-content:space-between; margin-top:4px;">
-          <span>${item.title} (${item.volume}) x ${item.count}</span>
-          <b>${sum} ₽</b>
+        html += `
+        <div class="cart-item-row">
+          <div class="cart-item-header">
+            <span>${item.title} (${item.volume})</span>
+            <button class="remove-btn" onclick="removeFromCart(${item.id}, '${item.volume}')">×</button>
+          </div>
+          <div class="cart-item-controls">
+            <button class="qty-btn" onclick="updateQty(${item.id}, '${item.volume}', -1)">-</button>
+            <span>${item.count}</span>
+            <button class="qty-btn" onclick="updateQty(${item.id}, '${item.volume}', 1)">+</button>
+            <b style="margin-left:auto;">${sum} ₽</b>
+          </div>
         </div>`;
       });
 
-      html += `<div style="display:flex; justify-content:space-between; margin-top:10px; font-size:15px; border-top:1px solid #3f3f46; padding-top:6px;">
+      html += `
+      <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:16px; border-top:1px solid #3f3f46; padding-top:10px;">
         <span>Итого:</span><b style="color:#facc15;">${total} ₽</b>
       </div>`;
 
       container.innerHTML = html;
-      document.getElementById('orderModal').style.display = 'block';
-    }
-
-    function closeCart() {
-      document.getElementById('orderModal').style.display = 'none';
-    }
-
-    function filterProducts() {
-      const q = document.getElementById('searchInput').value.toLowerCase().trim();
-      const filtered = rawProducts.filter(item => {
-        if (item.type === 'section') return true;
-        return item.name.toLowerCase().includes(q);
-      });
-      renderProducts(filtered);
-    }
-
-    function sendOrder() {
-      const name = document.getElementById('custName').value.trim();
-      const phone = document.getElementById('custPhone').value.trim();
-      const comment = document.getElementById('custComment').value.trim();
-
-      if (!name || !phone) {
-        alert('Пожалуйста, укажите ваше имя и телефон!');
-        return;
-      }
-
-      const total = cart.reduce((sum, item) => sum + (item.price * item.count), 0);
-      const orderData = { name, phone, comment, items: cart, total };
-
-      if (tg && tg.sendData) {
-        tg.sendData(JSON.stringify(orderData));
-      } else {
-        alert('Заказ сформирован! Открывайте эту страницу внутри Telegram-бота для отправки.');
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', loadData);
-  </script>
-</body>
-</html>
+      document.getElementById('orderModal').style
