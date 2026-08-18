@@ -3,14 +3,14 @@ import json
 import logging
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import CommandStart
-from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import WebAppInfo, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.client.session.aiohttp import AiohttpSession
 
 # 1. Токен бота от @BotFather
 BOT_TOKEN = "8997817506:AAEYfv6fY2QDLWVaGRxHS3sJjawZIaJlqMk"
 
-# 2. Ваш ID Telegram от @userinfobot (обязательно укажите ваши цифры!)
-MANAGER_CHAT_ID = 8113113940
+# 2. Ваш ID Telegram от @userinfobot (число без кавычек)
+MANAGER_CHAT_ID = 8113113940 
 
 # 3. Ссылка на ваш WebApp на GitHub Pages
 WEBAPP_URL = "https://ramalmekhraliev.github.io/venda-bot/"
@@ -22,14 +22,18 @@ dp = Dispatcher()
 
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🛍 Открыть каталог и заказать", web_app=WebAppInfo(url=WEBAPP_URL))]
-    ])
+    # Заменили Inline-кнопку на Reply-кнопку (кнопка внизу экрана)
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🛍 Открыть каталог и заказать", web_app=WebAppInfo(url=WEBAPP_URL))]
+        ],
+        resize_keyboard=True
+    )
     
     await message.answer(
         f"Здравствуйте, {message.from_user.first_name}! 👋\n\n"
         f"Добро пожаловать в магазин косметических отдушек **VENDA**.\n\n"
-        f"Нажмите кнопку ниже, чтобы открыть каталог, выбрать нужные объемы и оформить заказ.",
+        f"Нажмите кнопку в меню ниже, чтобы открыть каталог, выбрать нужные объемы и оформить заказ.",
         reply_markup=kb,
         parse_mode="Markdown"
     )
@@ -66,8 +70,8 @@ async def handle_web_app_data(message: types.Message):
             f"💰 <b>ИТОГО К ОПЛАТЕ: {total_sum} ₽</b>"
         )
 
-        manager_kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💬 Написать покупателю", url=f"tg://user?id={user.id}")]
+        manager_kb = types.InlineKeyboardMarkup(inline_keyboard=[
+            [types.InlineKeyboardButton(text="💬 Написать покупателю", url=f"tg://user?id={user.id}")]
         ])
 
         await bot.send_message(
