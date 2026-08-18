@@ -3,12 +3,14 @@ import json
 import logging
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import CommandStart
-# ВАЖНО: Импортируем ReplyKeyboardMarkup и KeyboardButton вместо Inline
-from aiogram.types import WebAppInfo, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.session.aiohttp import AiohttpSession
 
 BOT_TOKEN = "8997817506:AAEYfv6fY2QDLWVaGRxHS3sJjawZIaJlqMk"
-MANAGER_CHAT_ID = 8113113940
+
+# ВАЖНО: Укажите ваш личный ID в Telegram (узнать можно в @userinfobot)
+MANAGER_CHAT_ID = 471582442  
+
 WEBAPP_URL = "https://ramalmekhraliev.github.io/venda-bot/"
 
 session = AiohttpSession(proxy="http://proxy.server:3128")
@@ -17,18 +19,14 @@ dp = Dispatcher()
 
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
-    # ИСПРАВЛЕНИЕ: Создаем обычную кнопку меню (внизу экрана)
-    kb = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🛍 Открыть каталог и заказать", web_app=WebAppInfo(url=WEBAPP_URL))]
-        ],
-        resize_keyboard=True
-    )
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🛍 Открыть каталог и заказать", web_app=WebAppInfo(url=WEBAPP_URL))]
+    ])
     
     await message.answer(
         f"Здравствуйте, {message.from_user.first_name}! 👋\n\n"
         f"Добро пожаловать в магазин косметических отдушек **VENDA**.\n\n"
-        f"Нажмите кнопку в меню ниже (там, где вы печатаете текст), чтобы открыть каталог, выбрать нужные объемы и оформить заказ.",
+        f"Нажмите кнопку ниже, чтобы открыть каталог, выбрать нужные объемы и оформить заказ.",
         reply_markup=kb,
         parse_mode="Markdown"
     )
@@ -52,7 +50,7 @@ async def handle_web_app_data(message: types.Message):
 
         username_str = f"@{user.username}" if user.username else "Username не задан"
 
-        manager_msg = (
+        msg_body = (
             f"🛍 <b>НОВЫЙ ЗАКАЗ VENDA!</b>\n"
             f"──────────────────\n"
             f"👤 <b>Клиент:</b> {client_name}\n"
@@ -69,23 +67,29 @@ async def handle_web_app_data(message: types.Message):
             [InlineKeyboardButton(text="💬 Написать покупателю", url=f"tg://user?id={user.id}")]
         ])
 
-        await bot.send_message(
-            chat_id=MANAGER_CHAT_ID,
-            text=manager_msg,
-            parse_mode="HTML",
-            reply_markup=manager_kb
-        )
+        # 1. Отправка менеджеру
+        try:
+            await bot.send_message(
+                chat_id=MANAGER_CHAT_ID,
+                text=msg_body,
+                parse_mode="HTML",
+                reply_markup=manager_kb
+            )
+        except Exception as err:
+            logging.error(f"Не удалось отправить менеджеру: {err}")
 
+        # 2. Подтверждение покупателю
         await message.answer(
-            f"✅ <b>Спасибо, {client_name}! Ваш заказ принят.</b>\n\n"
-            f"Сумма заказа: <b>{total_sum} ₽</b>\n"
-            f"Менеджер свяжется с вами в течение нескольких минут для подтверждения.",
+            f"✅ <b>Спасибо, {client_name}! Ваш заказ успешно принят.</b>\n\n"
+            f"{items_text}\n"
+            f"💰 <b>Сумма к оплате: {total_sum} ₽</b>\n\n"
+            f"Менеджер свяжется с вами в ближайшее время для уточнения деталей.",
             parse_mode="HTML"
         )
 
     except Exception as e:
         logging.error(f"Ошибка при обработке заказа: {e}")
-        await message.answer("⚠️ Произошла ошибка при отправке заказа. Попробуйте еще раз.")
+        await message.answer("⚠️ Произошла ошибка при обработке заказа. Попробуйте еще раз.")
 
 async def main():
     logging.basicConfig(level=logging.INFO)
